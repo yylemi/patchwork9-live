@@ -59,7 +59,7 @@ let cutouts = [];   // the 3 loaded landscape PNGs
 let oneOffs = [];   // the loaded one-of-a-kind PNGs (the cat)
 let pieces = [];    // every piece on the page: which PNG, where, how big, how tilted, how faint
 let held = null;    // the piece the mouse is carrying right now (null = none)
-
+let trashImg;       // the bin picture
 
 // ---------------------------------------------------------------
 // 3. LOADING AND STARTING
@@ -70,6 +70,7 @@ let held = null;    // the piece the mouse is carrying right now (null = none)
 function preload() {
   cutouts = FILES.map(file => loadImage(file));
   oneOffs = ONE_OFFS.map(file => loadImage(file));
+  trashImg = loadImage('cutouts/trashasset1.png');
 }
 
 function setup() {
@@ -88,6 +89,7 @@ function setup() {
   noLoop();
 
   deal();
+  connect();
 }
 
 
@@ -101,19 +103,8 @@ function setup() {
 function deal() {
   pieces = [];
 
-  // Biggest size first, then smaller. Every PNG gets one copy of each size.
-  for (const size of SIZES) {
-    for (const img of cutouts) {
-      pieces.push({
-        img: img,
-        x: random(0.15, 0.85),        // spread over the page, but not hanging off the edge
-        y: random(0.15, 0.85),
-        size: size,
-        angle: random(-TILT, TILT),
-        alpha: random(FAINTEST, 1),
-      });
-    }
-  }
+  // Every landscape PNG gets one copy of each size.
+  for (const img of cutouts) addRepeated(img);
 
   // The anchor: the very first piece sits in the middle, straight and solid.
   // WHY: a pile of overlapping pieces needs one calm piece the eye lands on
@@ -123,23 +114,69 @@ function deal() {
   pieces[0].angle = 0;
   pieces[0].alpha = 1;
 
-  // The one-of-a-kind pieces go in LAST, one copy each.
-  // WHY last: pieces are drawn in list order, so the last ones end up
-  // on top of the pile, like the final thing you glue down.
-  // "solo: true" is the label that tells draw() not to multiply them.
-  for (const img of oneOffs) {
-    pieces.push({
+  // The one-of-a-kind pieces go in after, one copy each.
+  for (const img of oneOffs) addOneOff(img);
+
+  pieces.forEach((p, i) => p.id = i);
+  redraw();
+}
+
+// Pastes one PNG as repeated, multiplied pieces: one copy per size.
+// WHY its own function: deal() uses it for the landscapes, and the
+// "add PNG" button uses it for yours. One recipe, used twice.
+function addRepeated(img) {
+  for (const size of SIZES) {
+    // unshift = put at the START of the list (push would put it at the end).
+    // WHY: pieces are drawn in list order, so the start is the bottom of
+    // the pile. That keeps every new landscape UNDER the cat. For the
+    // multiplied pieces the order changes nothing, so this costs nothing.
+    pieces.unshift({
       img: img,
-      x: random(0.15, 0.85),
+      x: random(0.15, 0.85),        // spread over the page, but not hanging off the edge
       y: random(0.15, 0.85),
-      size: ONE_OFF_SIZE,
+      size: size,
       angle: random(-TILT, TILT),
-      alpha: 1,                       // always solid
-      solo: true,
+      alpha: random(FAINTEST, 1),
     });
   }
+}
 
-  redraw();
+// Pastes one PNG once, solid, on top.
+// push = put at the END of the list, so it is drawn last, on top of
+// the pile, like the final thing you glue down.
+// "solo: true" is the label that tells draw() not to multiply it.
+function addOneOff(img) {
+  pieces.push({
+    img: img,
+    x: random(0.15, 0.85),
+    y: random(0.15, 0.85),
+    size: ONE_OFF_SIZE,
+    angle: random(-TILT, TILT),
+    alpha: 1,                       // always solid
+    solo: true,
+  });
+}
+
+
+// ---------------------------------------------------------------
+// 4b. ADDING YOUR OWN PNGs (the two buttons in the corner)
+// ---------------------------------------------------------------
+
+// Called by the buttons in index.html. "files" are the PNGs you picked,
+// "list" is cutouts or oneOffs, "add" is addRepeated or addOneOff.
+// WHY the list too: deal() (Space) rebuilds the page from those two
+// lists. Putting your PNG in the list means it survives a new collage.
+function addPngs(files, list, add) {
+  for (const file of files) {
+    // The browser gives the picked file a temporary web address, so
+    // p5 can load it exactly like a file from the cutouts folder.
+    // The PNG never leaves your computer.
+    loadImage(URL.createObjectURL(file), img => {
+      list.push(img);
+      add(img);      // paste it on the current page, without reshuffling the rest
+      redraw();
+    });
+  }
 }
 
 
@@ -184,6 +221,8 @@ function draw() {
 
     pop();                               // put the page back straight for the next piece
   }
+  blendMode(BLEND);                                   // normal paint, not multiply
+image(trashImg, width - 60, height - 60, 80, 80);   // bottom-right corner, 80 x 80 pixels
 }
 
 
@@ -192,10 +231,13 @@ function draw() {
 // ---------------------------------------------------------------
 
 // Pick up the piece whose middle is closest to the mouse.
+// (Clicks on the buttons are ignored, so pressing "add PNG" never
+// grabs a piece by accident.)
 // WHY "closest middle": the pieces are see-through and overlap, so
 // "the one under the mouse" would need a lot of code to work out.
 // Closest middle is one line and feels right.
-function mousePressed() {
+function mousePressed(event) {
+  if (event.target.tagName !== 'CANVAS' || !pieces.length) return;
   held = pieces[0];
   for (const p of pieces) {
     if (dist(mouseX, mouseY, p.x * width, p.y * height) <
@@ -212,10 +254,16 @@ function mouseDragged() {
   if (!held) return;
   held.x = mouseX / width + held.grabX;
   held.y = mouseY / height + held.grabY;
+  socket.emit('move', { id: held.id, x: held.x, y: held.y });
   redraw();
 }
 
 function mouseReleased() {
+  if (held && dist(mouseX, mouseY, width - 60, height - 60) < 50) {
+    pieces.splice(pieces.indexOf(held), 1); 
+    socket.emit('remove', held.id);  // take this piece out of the list
+    redraw();
+  }
   held = null;
 }
 
@@ -224,7 +272,7 @@ function mouseReleased() {
 // 7. KEYS AND WINDOW
 // ---------------------------------------------------------------
 function keyPressed() {
-  if (key === ' ') deal();                              // space: throw the pieces again
+  if (key === ' ') { deal(); sendLayout(); };                              // space: throw the pieces again
   if (key === 's' || key === 'S') saveCanvas('patchwork9', 'png');   // S: keep this one
 }
 
@@ -233,4 +281,31 @@ function keyPressed() {
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
   redraw();
+}
+
+let socket;
+
+function connect() {
+  socket = io();
+
+  socket.on('layout', data => {
+    if (!data) return sendLayout();
+    deal();
+    pieces = data.map(d => Object.assign(pieces[d.id], d));
+    redraw();
+  });
+
+  socket.on('move', d => {
+    const p = pieces.find(p => p.id === d.id);
+    if (p) { p.x = d.x; p.y = d.y; redraw(); }
+  });
+
+  socket.on('remove', id => {
+    pieces = pieces.filter(p => p.id !== id);
+    redraw();
+  });
+}
+
+function sendLayout() {
+  socket.emit('layout', pieces.map(p => ({ id: p.id, x: p.x, y: p.y, angle: p.angle, alpha: p.alpha })));
 }

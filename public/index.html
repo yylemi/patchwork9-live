@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Patchwork 9</title>
+
+  <!-- p5.js does the drawing. Same version as patchwork8, so nothing new to learn. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.11.1/p5.min.js"></script>
+
+  <style>
+    /* No margin and no scrollbars: the collage is the whole page, like a sheet of paper. */
+    body { margin: 0; overflow: hidden; background: #fff; }
+    canvas { display: block; }
+
+    /* One small line of help in the corner. That is the whole interface. */
+    #help { position: fixed; left: 12px; bottom: 10px; font: 14px sans-serif; }
+
+    /* The two "add" words look like links: underlined, clickable.
+       The real file picker is hidden inside each one. WHY: the browser's
+       own picker button is big and grey; clicking a word is simpler. */
+    #help label { text-decoration: underline; cursor: pointer; }
+    #help input { display: none; }
+  </style>
+</head>
+<body>
+  <div id="help">
+    Drag a piece to move it. Space: new collage. S: save as PNG.
+    <!-- Clicking the word opens the file picker hidden inside it.
+         "multiple" lets you pick several PNGs at once.
+         onchange runs once you have picked: it hands the files to sketch.js.
+         value = '' empties the picker, so the same PNG can be added twice. -->
+    <label>Add PNG cutout (multiply)
+      <input type="file" accept="image/png" multiple
+             onchange="addPngs(this.files, cutouts, addRepeated); this.value = ''">
+    </label>
+    ·
+    <label>Add PNG cutout (unique)
+      <input type="file" accept="image/png" multiple
+             onchange="addPngs(this.files, oneOffs, addOneOff); this.value = ''">
+    </label>
+  </div>
+
+  <!-- All the code is in this one file. -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="sketch.js"></script>
+</body>
+</html>
