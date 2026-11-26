@@ -90,6 +90,7 @@ function setup() {
 
   deal();
   connect();
+  buildGallery();
 }
 
 
@@ -177,6 +178,85 @@ function addPngs(files, list, add) {
       redraw();
     });
   }
+}
+
+
+// ---------------------------------------------------------------
+// 4c. THE GALLERY (every PNG in the cutouts folder)
+// ---------------------------------------------------------------
+
+// How wide a gallery piece is when pasted, as a share of the page width.
+const GALLERY_SIZE = 0.25;
+
+// Pictures already loaded, by file name, so each PNG is loaded only once
+// even if you paste it ten times.
+const galleryImgs = {};
+
+function galleryImg(src) {
+  if (!galleryImgs[src]) galleryImgs[src] = loadImage(src, () => redraw());
+  return galleryImgs[src];
+}
+
+// Ask the server which PNGs are in the folder and show one thumbnail each.
+// loading="lazy": some PNGs are 15 MB, so only the ones you scroll to are fetched.
+function buildGallery() {
+  const grid = document.querySelector('#gallery .grid');
+  fetch('/api/cutouts').then(r => r.json()).then(files => {
+    for (const file of files) {
+      const src = 'cutouts/' + encodeURIComponent(file);
+      const thumb = document.createElement('img');
+      thumb.src = src;
+      thumb.title = file;
+      thumb.loading = 'lazy';
+      thumb.draggable = true;
+      thumb.onclick = () => pasteFromGallery(src, 0.5, 0.5);         // click: paste in the middle
+      thumb.ondragstart = e => e.dataTransfer.setData('text/plain', src);
+      grid.appendChild(thumb);
+    }
+  });
+
+  // Dropping a thumbnail on the page pastes it right where you let go.
+  const cnv = document.querySelector('canvas');
+  cnv.addEventListener('dragover', e => e.preventDefault());
+  cnv.addEventListener('drop', e => {
+    e.preventDefault();
+    const src = e.dataTransfer.getData('text/plain');
+    if (src.startsWith('cutouts/')) pasteFromGallery(src, e.offsetX / width, e.offsetY / height);
+  });
+}
+
+// Paste one gallery PNG at (x, y), shares of the page. Then it is a piece
+// like any other: drag it around, or drop it in the bin.
+// WHY "src" is kept on the piece: other people's browsers need the file
+// name to load the same picture when the piece is shared with them.
+function pasteFromGallery(src, x, y) {
+  const multiply = document.getElementById('galleryMultiply').checked;
+  const p = {
+    id: 'g' + Date.now() + Math.floor(Math.random() * 1e6),   // unique across everyone's browsers
+    src: src,
+    img: galleryImg(src),
+    x: x,
+    y: y,
+    size: GALLERY_SIZE,
+    angle: random(-TILT, TILT),
+    alpha: 1,
+    solo: !multiply,
+  };
+  // Same rule as the rest: solid pieces on top, multiplied ones underneath.
+  if (p.solo) pieces.push(p); else pieces.unshift(p);
+  socket.emit('add', pieceData(p));
+  redraw();
+}
+
+// The part of a piece that can travel to other browsers (not the picture itself).
+function pieceData(p) {
+  return { id: p.id, src: p.src, x: p.x, y: p.y, size: p.size,
+           angle: p.angle, alpha: p.alpha, solo: p.solo };
+}
+
+// Rebuild a gallery piece that someone else pasted.
+function pieceFromData(d) {
+  return Object.assign({ img: galleryImg(d.src) }, d);
 }
 
 
@@ -291,7 +371,17 @@ function connect() {
   socket.on('layout', data => {
     if (!data) return sendLayout();
     deal();
-    pieces = data.map(d => Object.assign(pieces[d.id], d));
+    const dealt = pieces;
+    pieces = data
+      .map(d => d.src ? pieceFromData(d)                         // pasted from the gallery
+                      : dealt[d.id] && Object.assign(dealt[d.id], d))  // part of the dealt collage
+      .filter(p => p);
+    redraw();
+  });
+
+  socket.on('add', d => {
+    const p = pieceFromData(d);
+    if (p.solo) pieces.push(p); else pieces.unshift(p);
     redraw();
   });
 
@@ -307,5 +397,5 @@ function connect() {
 }
 
 function sendLayout() {
-  socket.emit('layout', pieces.map(p => ({ id: p.id, x: p.x, y: p.y, angle: p.angle, alpha: p.alpha })));
+  socket.emit('layout', pieces.map(pieceData));
 }
