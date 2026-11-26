@@ -1,0 +1,10 @@
+{
+  "name": "patchwork9",
+  "main": "worker.js",
+  "compatibility_date": "2026-11-20",
+  "assets": { "directory": "./public" },
+  // Before starting, write the gallery's list of PNGs.
+  "build": { "command": "node list-cutouts.js" },
+  "durable_objects": { "bindings": [{ "name": "ROOM", "class_name": "Room" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Room"] }]
+}

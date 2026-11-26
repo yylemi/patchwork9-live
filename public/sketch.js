@@ -203,7 +203,7 @@ function galleryImg(src) {
 // loading="lazy": some PNGs are 15 MB, so only the ones you scroll to are fetched.
 function buildGallery() {
   const grid = document.querySelector('#gallery .grid');
-  fetch('/api/cutouts').then(r => r.json()).then(files => {
+  fetch('cutouts.json').then(r => r.json()).then(files => {
     for (const file of files) {
       const src = 'cutouts/' + encodeURIComponent(file);
       const thumb = document.createElement('img');
@@ -366,7 +366,16 @@ function windowResized() {
 let socket;
 
 function connect() {
-  socket = io();
+  // One WebSocket to the server. "socket" keeps the same emit/on as
+  // socket.io had, so nothing else in this file had to change.
+  const ws = new WebSocket(location.origin.replace('http', 'ws') + '/ws');
+  const handlers = {};
+  socket = {
+    emit: (type, data) => ws.readyState === 1 && ws.send(JSON.stringify({ type, data })),
+    on: (type, fn) => handlers[type] = fn,
+  };
+  ws.onmessage = e => { const m = JSON.parse(e.data); handlers[m.type](m.data); };
+  ws.onclose = () => setTimeout(() => location.reload(), 2000);   // lost the server: reload to reconnect
 
   socket.on('layout', data => {
     if (!data) return sendLayout();
