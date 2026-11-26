@@ -51,6 +51,9 @@ const TILT = 8;
 // like thick paper. Mixed together they give depth.
 const FAINTEST = 0.5;
 
+// How big the page is, in windows (3 = 3 windows across and 3 down).
+const PAGE = 3;
+
 
 // ---------------------------------------------------------------
 // 2. THE THINGS WE REMEMBER
@@ -59,7 +62,6 @@ let cutouts = [];   // the 3 loaded landscape PNGs
 let oneOffs = [];   // the loaded one-of-a-kind PNGs (the cat)
 let pieces = [];    // every piece on the page: which PNG, where, how big, how tilted, how faint
 let held = null;    // the piece the mouse is carrying right now (null = none)
-let trashImg;       // the bin picture
 
 // ---------------------------------------------------------------
 // 3. LOADING AND STARTING
@@ -70,11 +72,10 @@ let trashImg;       // the bin picture
 function preload() {
   cutouts = FILES.map(file => loadImage(file));
   oneOffs = ONE_OFFS.map(file => loadImage(file));
-  trashImg = loadImage('cutouts/trashasset1.png');
 }
 
 function setup() {
-  createCanvas(windowWidth, windowHeight);
+  createCanvas(windowWidth * PAGE, windowHeight * PAGE);
 
   // Place pictures by their middle, not their top-left corner.
   // WHY: a piece then turns around its own centre, like paper under a finger.
@@ -91,6 +92,7 @@ function setup() {
   deal();
   connect();
   buildGallery();
+  window.scrollTo((width - windowWidth) / 2, (height - windowHeight) / 2);
 }
 
 
@@ -296,13 +298,11 @@ function draw() {
 
     // Draw the piece. Width comes from its size; the height follows
     // from the picture's own shape, so it is never squashed.
-    const w = p.size * width;
+    const w = p.size * windowWidth;
     image(p.img, 0, 0, w, w * p.img.height / p.img.width);
 
     pop();                               // put the page back straight for the next piece
   }
-  blendMode(BLEND);                                   // normal paint, not multiply
-image(trashImg, width - 60, height - 60, 80, 80);   // bottom-right corner, 80 x 80 pixels
 }
 
 
@@ -339,7 +339,7 @@ function mouseDragged() {
 }
 
 function mouseReleased() {
-  if (held && dist(mouseX, mouseY, width - 60, height - 60) < 50) {
+  if (held && dist(winMouseX, winMouseY, windowWidth - 60, windowHeight - 60) < 50) {
     pieces.splice(pieces.indexOf(held), 1); 
     socket.emit('remove', held.id);  // take this piece out of the list
     redraw();
@@ -359,7 +359,7 @@ function keyPressed() {
 // If the window changes size, the page follows. The pieces are stored
 // as shares of the page, so they land in the right place by themselves.
 function windowResized() {
-  resizeCanvas(windowWidth, windowHeight);
+  resizeCanvas(windowWidth * PAGE, windowHeight * PAGE);
   redraw();
 }
 
