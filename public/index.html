@@ -24,6 +24,23 @@
        own picker button is big and grey; clicking a word is simpler. */
     #help label { text-decoration: underline; cursor: pointer; }
     #help input { display: none; }
+    #help a { text-decoration: underline; cursor: pointer; }
+
+    /* The gallery: a strip down the left side with every PNG of the cutouts folder.
+       Click a picture to paste it in the middle, or drag it onto the page. */
+    #gallery {
+      position: fixed; left: 0; top: 0; bottom: 36px; width: 180px;
+      overflow-y: auto; background: rgba(255,255,255,0.95);
+      border-right: 1px solid #ddd; padding: 8px; box-sizing: border-box;
+      font: 13px sans-serif; display: none;
+    }
+    #gallery.open { display: block; }
+    #gallery .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+    #gallery img {
+      width: 100%; aspect-ratio: 1; object-fit: contain; cursor: grab;
+      background: #f4f4f4; border-radius: 4px;
+    }
+    #gallery img:hover { outline: 2px solid #000; }
   </style>
 </head>
 <body>
@@ -42,6 +59,15 @@
       <input type="file" accept="image/png" multiple
              onchange="addPngs(this.files, oneOffs, addOneOff); this.value = ''">
     </label>
+    ·
+    <a onclick="document.getElementById('gallery').classList.toggle('open')">Gallery</a>
+  </div>
+
+  <!-- Filled in by sketch.js with the PNGs of the cutouts folder. -->
+  <div id="gallery">
+    Click or drag a picture onto the page.
+    <label><input type="checkbox" id="galleryMultiply"> multiply</label>
+    <div class="grid"></div>
   </div>
 
   <img id="trash" src="cutouts/trashasset1.png" alt="Bin">
