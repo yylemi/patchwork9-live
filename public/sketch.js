@@ -19,7 +19,7 @@
 
 // The cut-outs. To use other PNGs, put them in the cutouts folder
 // and write their names here.
-const FILES = ['cutouts/mountain.png', 'cutouts/valley.png', 'cutouts/trees.png'];
+const FILES = ['cutouts/mountain.webp', 'cutouts/valley.webp', 'cutouts/trees.webp'];
 
 // The one-of-a-kind pieces: a second class of item. Each appears
 // exactly ONCE, and is pasted solid on top instead of multiplied.
@@ -27,7 +27,7 @@ const FILES = ['cutouts/mountain.png', 'cutouts/valley.png', 'cutouts/trees.png'
 // repeated and melting into each other. The cat is the subject. If it
 // were multiplied it would sink into the dark trees and disappear,
 // and three cats would make it a pattern, not a character.
-const ONE_OFFS = ['cutouts/cat.png'];
+const ONE_OFFS = ['cutouts/cat.webp'];
 
 // How wide a one-of-a-kind piece is, as a share of the page width.
 const ONE_OFF_SIZE = 0.09;
@@ -195,6 +195,7 @@ const GALLERY_SIZE = 0.25;
 const galleryImgs = {};
 
 function galleryImg(src) {
+  src = src.replace(/\.png$/, '.webp');   // collages saved before the switch to WebP
   if (!galleryImgs[src]) galleryImgs[src] = loadImage(src, () => redraw());
   return galleryImgs[src];
 }
